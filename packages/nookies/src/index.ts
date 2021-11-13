@@ -1,10 +1,10 @@
-import * as cookie from 'cookie'
-import * as express from 'express'
-import * as next from 'next'
-import * as setCookieParser from 'set-cookie-parser'
-import { Cookie } from 'set-cookie-parser'
+import * as cookie from "cookie";
+import * as express from "express";
+import * as next from "next";
+import * as setCookieParser from "set-cookie-parser";
+import { Cookie } from "set-cookie-parser";
 
-import { areCookiesEqual, createCookie, isBrowser } from './utils'
+import { areCookiesEqual, createCookie, isBrowser } from "./utils";
 
 /**
  * Parses cookies.
@@ -14,22 +14,22 @@ import { areCookiesEqual, createCookie, isBrowser } from './utils'
  */
 export function parseCookies(
   ctx?:
-    | Pick<next.NextPageContext, 'req'>
+    | Pick<next.NextPageContext, "req">
     | { req: next.NextApiRequest }
     | { req: express.Request }
     | null
     | undefined,
-  options?: cookie.CookieParseOptions,
+  options?: cookie.CookieParseOptions
 ) {
   if (ctx?.req?.headers?.cookie) {
-    return cookie.parse(ctx.req.headers.cookie as string, options)
+    return cookie.parse(ctx.req.headers.cookie as string, options);
   }
 
   if (isBrowser()) {
-    return cookie.parse(document.cookie, options)
+    return cookie.parse(document.cookie, options);
   }
 
-  return {}
+  return {};
 }
 
 /**
@@ -42,31 +42,34 @@ export function parseCookies(
  */
 export function setCookie(
   ctx:
-    | Pick<next.NextPageContext, 'res'>
-    | { res: next.NextApiResponse }
-    | { res: express.Response }
+    | Pick<next.NextPageContext, "res" | "req">
+    | { res: next.NextApiResponse; req: next.NextApiRequest }
+    | { res: express.Response; req: express.Request }
     | null
     | undefined,
   name: string,
   value: string,
-  options: cookie.CookieSerializeOptions = {},
+  options: cookie.CookieSerializeOptions = {}
 ) {
   // SSR
   if (ctx?.res?.getHeader && ctx.res.setHeader) {
     // Check if response has finished and warn about it.
-    if (ctx?.res?.finished) {
-      console.warn(`Not setting "${name}" cookie. Response has finished.`)
-      console.warn(`You should set cookie before res.send()`)
-      return {}
-    }
+    // if (ctx?.res?.finished) {
+    //   console.warn(`Not setting "${name}" cookie. Response has finished.`)
+    //   console.warn(`You should set cookie before res.send()`)
+    //   return {}
+    // }
 
     /**
      * Load existing cookies from the header and parse them.
      */
-    let cookies = ctx.res.getHeader('Set-Cookie') || []
 
-    if (typeof cookies === 'string') cookies = [cookies]
-    if (typeof cookies === 'number') cookies = []
+    let cookies: string | number | any[] = String(
+      ctx?.req?.headers?.cookie || ""
+    );
+
+    if (typeof cookies === "string") cookies = [cookies];
+    if (typeof cookies === "number") cookies = [];
 
     /**
      * Parse cookies but ignore values - we've already encoded
@@ -74,14 +77,14 @@ export function setCookie(
      */
     const parsedCookies = setCookieParser.parse(cookies, {
       decodeValues: false,
-    })
+    });
 
     /**
      * We create the new cookie and make sure that none of
      * the existing cookies match it.
      */
-    const newCookie = createCookie(name, value, options)
-    let cookiesToSet: string[] = []
+    const newCookie = createCookie(name, value, options);
+    let cookiesToSet: string[] = [];
 
     parsedCookies.forEach((parsedCookie: Cookie) => {
       if (!areCookiesEqual(parsedCookie, newCookie)) {
@@ -96,28 +99,28 @@ export function setCookie(
             // we prevent reencoding by default, but you might override it
             encode: (val: string) => val,
             ...(parsedCookie as cookie.CookieSerializeOptions),
-          },
-        )
+          }
+        );
 
-        cookiesToSet.push(serializedCookie)
+        cookiesToSet.push(serializedCookie);
       }
-    })
-    cookiesToSet.push(cookie.serialize(name, value, options))
+    });
+    cookiesToSet.push(cookie.serialize(name, value, options));
 
     // Update the header.
-    ctx.res.setHeader('Set-Cookie', cookiesToSet)
+    ctx.res.setHeader("Set-Cookie", cookiesToSet);
   }
 
   // Browser
   if (isBrowser()) {
     if (options && options.httpOnly) {
-      throw new Error('Can not set a httpOnly cookie in the browser.')
+      throw new Error("Can not set a httpOnly cookie in the browser.");
     }
 
-    document.cookie = cookie.serialize(name, value, options)
+    document.cookie = cookie.serialize(name, value, options);
   }
 
-  return {}
+  return {};
 }
 
 /**
@@ -129,19 +132,19 @@ export function setCookie(
  */
 export function destroyCookie(
   ctx:
-    | Pick<next.NextPageContext, 'res'>
+    | Pick<next.NextPageContext, "res">
     | { res: next.NextApiResponse }
     | { res: express.Response }
     | null
     | undefined,
   name: string,
-  options?: cookie.CookieSerializeOptions,
+  options?: cookie.CookieSerializeOptions
 ) {
   /**
    * We forward the request destroy to setCookie function
    * as it is the same function with modified maxAge value.
    */
-  return setCookie(ctx, name, '', { ...(options || {}), maxAge: -1 })
+  return setCookie(ctx, name, "", { ...(options || {}), maxAge: -1 });
 }
 
 /* Utility Exports */
@@ -150,4 +153,4 @@ export default {
   set: setCookie,
   get: parseCookies,
   destroy: destroyCookie,
-}
+};
